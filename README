@@ -1,0 +1,26 @@
+This is clj-bitfields, a library that provides a `with-bitfields' macro
+which allows accessing Java byte arrays as sequences of structures
+consisting of packed bit-fields.  The layout of these structures is
+compatible with that used by gcc on little-endian architectures.
+
+For example, in C you might define a packed structure as follows:
+
+       struct edge {
+           uint32_t last:1;
+           uint32_t term:1;
+           uint32_t dest:22;
+           uint32_t char:8;
+       };
+
+taking up four bytes.  Assuming you have these four bytes as a Java
+array of bytes (named arr) in Clojure, you can access the individual
+fields as:
+
+  (with-bitfields arr 0 {last 1, term 1, dest 22, char 8}
+    {:last last, :term term, :dest dest, :char char})
+
+clj-bitfields currently supports read-only access of bitfields.
+
+clj-bitfields' home online is on Github.  See 
+http://github.com/nathell/clj-bitfields/tree/master
+for details.
