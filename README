@@ -16,7 +16,7 @@ taking up four bytes.  Assuming you have these four bytes as a Java
 array of bytes (named arr) in Clojure, you can access the individual
 fields as:
 
-  (with-bitfields arr 0 {last 1, term 1, dest 22, char 8}
+  (with-bitfields arr 0 [last 1, term 1, dest 22, char 8]
     {:last last, :term term, :dest dest, :char char})
 
 clj-bitfields currently supports read-only access of bitfields.

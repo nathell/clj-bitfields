@@ -113,13 +113,14 @@ bits that this part should be shifted left by."
         partial-sums))
 
 (defmacro with-bitfields
-  "Execute BODY with variables bound as integer values of bit fields 
+  "Execute BODY with variables bound as integer values of bit fields
 in a fragment of given Java byte array, starting at position OFS.
-BIT-DESCRIPTIONS is a map from symbols to numbers of bits in the
-corresponding bit field."
+BIT-DESCRIPTIONS is a vector containing alternating symbols and
+numbers of bits in the corresponding bit field."  
   [arr ofs bit-descriptions & body]
   (letfn [(make-part [[x y z shift]] (make-shifted-byte-part arr x ofs y z shift))
           (make-parts [x] `(+ ~@(map make-part x)))]
-    (let [groups (map make-parts (get-byte-parts (map second bit-descriptions)))]
+    (let [bit-descriptions (partition 2 bit-descriptions) 
+          groups (map make-parts (get-byte-parts (map second bit-descriptions)))]
       `(let ~(vec (interleave (map first bit-descriptions) groups))
          ~@body))))
