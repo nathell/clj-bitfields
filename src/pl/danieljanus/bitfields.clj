@@ -5,12 +5,12 @@
 in a Java array of bytes ARR, composed of bits between FROM (inclusive) 
 and TO (exclusive)."
   [arr i ofs from to]
-  (let [byte `(aget ~arr (unchecked-add ~ofs ~i))] 
+  (let [byte `(aget ~arr (unchecked-add (int ~ofs) ~i))] 
     (cond (zero? from)
-          `(bit-and ~byte ~(- (bit-shift-left 1 to) 1)),
+          `(bit-and (int ~byte) ~(- (bit-shift-left 1 to) 1)),
           
           true
-          `(bit-shift-right (bit-and ~byte ~(- (bit-shift-left 1 to) 1)) ~from))))
+          `(bit-shift-right (bit-and (int ~byte) ~(- (bit-shift-left 1 to) 1)) ~from))))
 
 (defn make-shifted-byte-part 
   "Same as MAKE-BYTE-PART, except the byte fragment is shifted left by SHIFT."
@@ -112,6 +112,13 @@ bits that this part should be shifted left by."
         indexed 
         partial-sums))
 
+(defn add
+  "Generate a series of unchecked-adds of arguments."
+  ([] 0)
+  ([x] `(int ~x))
+  ([x y] `(unchecked-add (int ~x) (int ~y)))
+  ([x y & rest] `(unchecked-add (int ~x) ~(apply add y rest))))
+
 (defmacro with-bitfields
   "Execute BODY with variables bound as integer values of bit fields
 in a fragment of given Java byte array, starting at position OFS.
@@ -119,7 +126,7 @@ BIT-DESCRIPTIONS is a vector containing alternating symbols and
 numbers of bits in the corresponding bit field."  
   [arr ofs bit-descriptions & body]
   (letfn [(make-part [[x y z shift]] (make-shifted-byte-part arr x ofs y z shift))
-          (make-parts [x] `(+ ~@(map make-part x)))]
+          (make-parts [x] (apply add (map make-part x)))]
     (let [bit-descriptions (partition 2 bit-descriptions) 
           groups (map make-parts (get-byte-parts (map second bit-descriptions)))]
       `(let ~(vec (interleave (map first bit-descriptions) groups))
