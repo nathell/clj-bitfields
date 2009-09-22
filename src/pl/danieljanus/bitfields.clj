@@ -1,11 +1,12 @@
 (ns pl.danieljanus.bitfields)
 
 (defn make-byte-part
-  "Generates a snippet of code that returns a fragment of (+ I OFS)'th byte
-in a Java array of bytes ARR, composed of bits between FROM (inclusive) 
-and TO (exclusive)."
-  [arr i ofs from to]
-  (let [byte `(aget ~arr (unchecked-add (int ~ofs) ~i))] 
+  "Generates a snippet of code that returns a fragment of (+ I OFS)'th
+byte in a Java array-like structure of bytes ARR, composed of bits
+between FROM (inclusive) and TO (exclusive).  GETFN should be the name
+of the function used to retrieve individual bytes from ARR." 
+  [arr i ofs from to getfn]
+  (let [byte `(~getfn ~arr (unchecked-add (int ~ofs) ~i))] 
     (cond (zero? from)
           `(bit-and (int ~byte) ~(- (bit-shift-left 1 to) 1)),
           
@@ -14,8 +15,8 @@ and TO (exclusive)."
 
 (defn make-shifted-byte-part 
   "Same as MAKE-BYTE-PART, except the byte fragment is shifted left by SHIFT."
-  [seq i ofs from to shift]
-  (let [inner (make-byte-part seq i ofs from to)]
+  [seq i ofs from to shift getfn]
+  (let [inner (make-byte-part seq i ofs from to getfn)]
     (if (zero? shift)
       inner
       `(bit-shift-left ~inner ~shift)))) 
@@ -119,15 +120,26 @@ bits that this part should be shifted left by."
   ([x y] `(unchecked-add (int ~x) (int ~y)))
   ([x y & rest] `(unchecked-add (int ~x) ~(apply add y rest))))
 
+(defn gen-with-bitfields
+  "Generate WITH-BITFIELDS-* body."  
+  [arr ofs bit-descriptions getfn body]
+  (letfn [(make-part [[x y z shift]] (make-shifted-byte-part arr x ofs y z shift getfn))
+          (make-parts [x] (apply add (map make-part x)))]
+    (let [bit-descriptions (partition 2 bit-descriptions) 
+          groups (map make-parts (get-byte-parts (map second bit-descriptions)))]
+      `(let ~(vec (interleave (map first bit-descriptions) groups))
+         ~@body))))
+
 (defmacro with-bitfields
   "Execute BODY with variables bound as integer values of bit fields
 in a fragment of given Java byte array, starting at position OFS.
 BIT-DESCRIPTIONS is a vector containing alternating symbols and
 numbers of bits in the corresponding bit field."  
   [arr ofs bit-descriptions & body]
-  (letfn [(make-part [[x y z shift]] (make-shifted-byte-part arr x ofs y z shift))
-          (make-parts [x] (apply add (map make-part x)))]
-    (let [bit-descriptions (partition 2 bit-descriptions) 
-          groups (map make-parts (get-byte-parts (map second bit-descriptions)))]
-      `(let ~(vec (interleave (map first bit-descriptions) groups))
-         ~@body))))
+  (gen-with-bitfields arr ofs bit-descriptions 'aget body))
+
+(defmacro with-bitfields-mmap
+  "Same as WITH-BITFIELDS, but usable with ByteBuffers created with
+clojure.contrib.mmap."
+  [arr ofs bit-descriptions & body]
+  (gen-with-bitfields arr ofs bit-descriptions '.get body))  
